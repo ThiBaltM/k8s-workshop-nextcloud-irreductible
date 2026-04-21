@@ -40,3 +40,5 @@ rendered/
 *.local.yaml
 *.local.sh
 local/
+tls.key
+tls.crt
