@@ -1,0 +1,144 @@
+# This file defines TWO ConfigMaps:
+#   1. nextcloud-config — environment variables for the PHP-FPM container
+#   2. nginx-config     — nginx configuration for the sidecar container
+#
+# Rename to configmap.yaml when complete.
+# Apply with: kubectl apply -f configmap.yaml
+
+# ── ConfigMap 1: Nextcloud environment variables ──────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nextcloud-config
+  namespace: # TODO: which namespace?
+data:
+  # Domains Nextcloud accepts requests from.
+  # If a request arrives from a domain not listed here, Nextcloud returns:
+  # "Access through untrusted domain". This is a security feature, not a bug.
+  # TODO: set this to the hostname you will use to access Nextcloud.
+  NEXTCLOUD_TRUSTED_DOMAINS: # TODO (e.g., nextcloud.local)
+
+  # Admin username for the Nextcloud web interface.
+  # This is not sensitive — put it here in the ConfigMap.
+  # The password goes in the Secret (secrets.yaml).
+  NEXTCLOUD_ADMIN_USER: "admin"
+
+  # Protocol used for URL generation and redirects.
+  # Use "http" now. On Day 3, after enabling TLS, change this to "https".
+  # If this is wrong, logins will redirect to the wrong protocol.
+  OVERWRITEPROTOCOL: "http"
+
+  # Base URL for the occ command-line tool and link generation.
+  # TODO: set to the full URL (protocol + hostname) — must match the above.
+  OVERWRITECLIURL: # TODO (e.g., http://nextcloud.local)
+
+  # PostgreSQL connection details.
+  # CNPG creates a Service named <cluster-name>-rw for the primary instance.
+  # Use the full FQDN: <service>.<namespace>.svc.cluster.local
+  # TODO: set these to match your CNPG Cluster name and namespace.
+  POSTGRES_HOST: # TODO (e.g., postgres-rw.nextcloud.svc.cluster.local)
+  POSTGRES_DB:   # TODO (e.g., nextcloud — must match the initdb.database in cluster.yaml)
+
+  # Redis connection details.
+  # TODO: what is the Service name for Redis?
+  # Kubernetes DNS resolves Service names within the same namespace as short names.
+  # Within the same namespace: just the Service name works.
+  # Cross-namespace: <service>.<namespace>.svc.cluster.local
+  REDIS_HOST: # TODO
+  REDIS_HOST_PORT: "6379"
+
+  # PHP runtime limits. These env vars are respected by the nextcloud:fpm image.
+  # Increase them if Nextcloud refuses large file uploads.
+  PHP_MEMORY_LIMIT: "512M"
+  PHP_UPLOAD_LIMIT: "512M"
+
+  # Skip Nextcloud's upgrade check on every container startup.
+  NEXTCLOUD_UPDATE: "1"
+
+---
+# ── ConfigMap 2: nginx configuration ──────────────────────────────────────────
+# nginx acts as the HTTP frontend for Nextcloud's PHP-FPM backend.
+# It serves static files directly and proxies PHP requests via FastCGI.
+#
+# This ConfigMap is mounted into the nginx sidecar container.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: # TODO: same namespace as above
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+      sendfile      on;
+      keepalive_timeout 65;
+
+      server {
+        listen 80;
+        server_name _;
+
+        # TODO: verify this root matches the mountPath of the shared volume in the nginx container.
+        root /var/www/html;
+        index index.php index.html;
+
+        # Set a generous upload limit for Nextcloud file uploads.
+        # nginx enforces this limit — set it higher than your largest expected upload.
+        client_max_body_size 512M;
+
+        # Serve static files; rewrite everything else to index.php (Nextcloud's router).
+        location / {
+          try_files $uri $uri/ /index.php$request_uri;
+        }
+
+        # Handle Nextcloud's .well-known URLs (CalDAV, CardDAV redirects).
+        location ^~ /.well-known {
+          return 301 /index.php$request_uri;
+        }
+
+        # PHP request handling.
+        location ~ \.php(?:$|/) {
+          fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+          if (!-f $document_root$fastcgi_script_name) { return 404; }
+
+          # TODO: where is PHP-FPM listening?
+          # HINT: FPM and nginx run in the SAME POD — they share a network namespace.
+          # That means they share localhost. A sidecar is not on a separate host.
+          # Should you use a Service name here, or something else?
+          #
+          # DELIBERATE ERROR: the value below is wrong. Fix it.
+          fastcgi_pass nextcloud:9000;   # wrong — uses Service DNS, not pod-local address
+
+          fastcgi_index index.php;
+
+          # TODO: something important is missing from the FastCGI parameters below.
+          # PHP-FPM needs to know the absolute path of the PHP script to execute.
+          # Research: what is the SCRIPT_FILENAME FastCGI parameter?
+          # Without it, FPM returns a blank page or a 502 error.
+          include fastcgi_params;        # incomplete — a required param is missing here
+
+          fastcgi_param PATH_INFO       $fastcgi_path_info;
+          fastcgi_param HTTPS           $https if_not_empty;
+          fastcgi_read_timeout          300;
+          fastcgi_send_timeout          300;
+        }
+
+        # Block access to hidden files (.htaccess, .git, etc.).
+        location ~ /\. {
+          deny all;
+        }
+
+        # Block access to Nextcloud's data directory.
+        location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/) {
+          return 404;
+        }
+      }
+    }

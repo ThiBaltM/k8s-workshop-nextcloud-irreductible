@@ -1,0 +1,32 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: k8s-workshop
+
+nodes:
+  - role: control-plane
+    # Label this node as ingress-ready so Traefik can be pinned here via nodeSelector.
+    # extraPortMappings bind container ports to the host — required for browser access
+    # on WSL2 where MetalLB IPs are not reachable from Windows directly.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+
+  - role: worker
+
+  - role: worker
+
+# Note on StorageClass:
+# kind ships with local-path-provisioner pre-installed as the default StorageClass.
+# It is deployed internally by kind after cluster creation — it cannot be disabled
+# via kubeadmConfigPatches. Students will use this StorageClass during the workshop.
+# Run `kubectl get storageclass` after cluster creation to inspect it.

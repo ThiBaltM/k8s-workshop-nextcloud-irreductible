@@ -1,0 +1,94 @@
+# Helm values override for kube-prometheus-stack.
+#
+# Install with:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring \
+#     --values manifests/08-monitoring/values.yaml \
+#     --set crds.enabled=true   # or check the chart README for current CRD install method
+#
+# Browse all available values:
+#   helm show values prometheus-community/kube-prometheus-stack | less
+#
+# Rename to values.yaml when complete.
+
+# ── Grafana ────────────────────────────────────────────────────────────────────
+grafana:
+  # TODO: set a known admin password.
+  # The default is randomly generated and printed in the chart notes — but you need
+  # a reliable value for the demo. Choose something you won't forget.
+  adminPassword: # TODO
+
+  ingress:
+    # TODO: should Grafana be accessible via Ingress?
+    enabled: # TODO (true/false)
+
+    # TODO: use the same IngressClass as the rest of the workshop.
+    ingressClassName: # TODO
+
+    hosts:
+      - # TODO: what hostname for Grafana? (e.g., grafana.local)
+        # Add this to your hosts file alongside nextcloud.local.
+
+    # TLS — leave empty on Day 3 start. Configure after cert-manager is ready.
+    # tls:
+    #   - secretName: # TODO: cert-manager will create this Secret
+    #     hosts:
+    #       - # TODO
+
+  persistence:
+    # TODO: should Grafana dashboards and settings survive pod restarts?
+    # Without persistence, any custom dashboards you create are lost on pod restart.
+    enabled: # TODO (true/false)
+    size:    # TODO (e.g., 1Gi)
+
+  # Optional: set the admin email (shown in Grafana's profile)
+  # adminUser: admin
+
+# ── Prometheus ─────────────────────────────────────────────────────────────────
+prometheus:
+  prometheusSpec:
+    # TODO: by default, Prometheus only discovers ServiceMonitors and PodMonitors
+    # in the 'monitoring' namespace. To scrape CloudNativePG metrics in the
+    # 'nextcloud' namespace, you must widen the selector.
+    # Setting to {} means "watch all namespaces".
+    # What value should these selectors have?
+    podMonitorNamespaceSelector:     # TODO: {} to watch all namespaces
+    serviceMonitorNamespaceSelector: # TODO
+    ruleNamespaceSelector:           # TODO
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              # TODO: how much storage does Prometheus need?
+              # It retains metrics for 10 days by default.
+              # For a workshop with light load, a small size is fine.
+              storage: # TODO (e.g., 5Gi)
+
+# ── Alertmanager ───────────────────────────────────────────────────────────────
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: # TODO (e.g., 1Gi)
+
+# ── Default scrape targets ─────────────────────────────────────────────────────
+# kube-prometheus-stack pre-configures scraping for:
+#   - Kubernetes API server
+#   - kubelet and cAdvisor (pod/container metrics)
+#   - node-exporter (host metrics)
+#   - CoreDNS
+#   - kube-state-metrics (object-level metrics)
+#
+# These require no additional configuration — they work out of the box.
+# CloudNativePG metrics require a separate PodMonitor (see DAY3.md Step 7).

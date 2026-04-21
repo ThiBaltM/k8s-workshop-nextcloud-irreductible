@@ -1,0 +1,42 @@
+# Kubernetes credentials — never commit these
+kubeconfig
+*.kubeconfig
+.kube/
+
+# Secrets and environment files
+.env
+.env.*
+*.secret
+secrets.yaml
+secrets.json
+
+# Helm
+charts/
+*.tgz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor directories
+.idea/
+.vscode/
+*.iml
+
+# Generated output
+output/
+rendered/
+
+# Local overrides (student-specific, not to be committed)
+*.local.yaml
+*.local.sh
+local/

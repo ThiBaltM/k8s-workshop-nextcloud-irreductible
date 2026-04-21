@@ -1,0 +1,191 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud
+  namespace: # TODO: which namespace?
+  labels:
+    app: nextcloud
+spec:
+  # TODO: how many replicas?
+  # Consider: your PVC uses ReadWriteOnce — only one node can mount it at a time.
+  # What happens if you set replicas: 2 and both pods are scheduled to different nodes?
+  replicas: # TODO
+
+  selector:
+    matchLabels:
+      app: nextcloud   # must match template.metadata.labels below
+
+  template:
+    metadata:
+      labels:
+        app: nextcloud
+    spec:
+      # TODO: think about the security context.
+      # PHP-FPM runs as www-data (UID 33). The PVC starts with root (UID 0) ownership.
+      # What must happen before FPM can write to /var/www/html?
+      # The init container below is your answer — but read this comment first.
+
+      initContainers:
+        # This init container runs ONCE before any main container starts.
+        # Its only job: fix ownership on the data volume so PHP-FPM can write to it.
+        - name: fix-permissions
+          # TODO: choose a minimal image (busybox, alpine — something with chown).
+          image: # TODO
+          command:
+            # TODO: write the command that sets correct ownership on /var/www/html.
+            # PHP-FPM runs as www-data. What is www-data's UID and GID?
+            # Hint: UID 33 is the standard www-data UID in Debian-based images.
+            # Format: ["sh", "-c", "chown ..."]
+          volumeMounts:
+            - name: nextcloud-data
+              mountPath: /var/www/html
+
+      containers:
+        # ─────────────────────────────────────────────────────────────────────
+        # Container 1: PHP-FPM
+        # Handles all PHP execution. Does NOT serve HTTP directly.
+        # Listens for FastCGI connections on port 9000.
+        # nginx (container 2) proxies PHP requests to this container via FastCGI.
+        # ─────────────────────────────────────────────────────────────────────
+        - name: nextcloud
+          # TODO: use the FPM variant — NOT nextcloud:latest (that image uses Apache).
+          # Look at Docker Hub for available tags: hub.docker.com/_/nextcloud
+          image: # TODO (e.g., nextcloud:31-fpm-alpine)
+
+          ports:
+            - containerPort: 9000   # FastCGI — internal use only (not exposed via Service)
+              name: fastcgi
+
+          envFrom:
+            # Load all keys from the ConfigMap as environment variables.
+            - configMapRef:
+                name: # TODO: name of your nextcloud-config ConfigMap
+
+          env:
+            # Map PostgreSQL credentials from the CNPG-managed Secret.
+            # CNPG creates a Secret named <cluster-name>-app automatically.
+            # Its keys (username, password) do NOT match Nextcloud's expected env var names —
+            # you must map them explicitly. Using envFrom on the CNPG secret would inject
+            # wrong variable names (e.g., "username" instead of "POSTGRES_USER").
+            #
+            # POSTGRES_HOST and POSTGRES_DB come from the ConfigMap via envFrom above.
+            # Only the credentials (username, password) come from the CNPG Secret.
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: # TODO: name of the CNPG-created Secret (<cluster-name>-app)
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: # TODO: same Secret as above
+                  key: password
+            - name: NEXTCLOUD_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: # TODO: name of your nextcloud-admin Secret
+                  key: NEXTCLOUD_ADMIN_PASSWORD
+
+          volumeMounts:
+            - name: nextcloud-data
+              mountPath: /var/www/html
+
+          resources:
+            requests:
+              cpu:    # TODO
+              memory: # TODO
+            limits:
+              cpu:    # TODO
+              # TODO: PHP-FPM worker processes are memory-hungry.
+              # Your ConfigMap sets PHP_MEMORY_LIMIT — the container limit must be higher.
+              # What happens if the container limit is lower than PHP's own memory limit?
+              memory: # TODO
+
+          readinessProbe:
+            # DELIBERATE ERROR: PHP-FPM speaks FastCGI, not HTTP.
+            # An httpGet probe on port 9000 will never succeed — FPM will reject it.
+            # Fix: either use an exec probe on this container, or move the HTTP probe
+            # to the nginx container (which does speak HTTP).
+            # Also: Nextcloud's first boot takes 60–120s (DB migrations + app install).
+            # A failureThreshold of 3 with a 10s period will kill the container in 30s.
+            # That is not enough. Fix both the probe type AND the timing.
+            httpGet:
+              path: /status.php
+              port: 9000          # WRONG: FPM does not serve HTTP on this port
+            initialDelaySeconds: 10   # WRONG: too short for first boot
+            periodSeconds: 10
+            failureThreshold: 3       # WRONG: too low for a slow-starting application
+
+          livenessProbe:
+            # Same issue as readinessProbe above. Fix it.
+            httpGet:
+              path: /status.php
+              port: 9000          # WRONG
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3   # WRONG
+
+        # ─────────────────────────────────────────────────────────────────────
+        # Container 2: nginx sidecar
+        # Serves HTTP on port 80. Handles:
+        #   - Static files: served directly from the shared volume
+        #   - PHP files: proxied to FPM via FastCGI on localhost:9000
+        #
+        # FPM and nginx share the pod's network namespace.
+        # "localhost" in this container reaches FPM in container 1.
+        # ─────────────────────────────────────────────────────────────────────
+        - name: nginx
+          image: nginx:alpine
+
+          ports:
+            - containerPort: 8080   # DELIBERATE ERROR: nginx should listen on port 80.
+              name: http             # The Service and Ingress expect port 80. Fix this.
+
+          volumeMounts:
+            - name: nextcloud-data
+              mountPath: /var/www/html
+              # TODO: should this mount be readOnly?
+              # nginx serves Nextcloud's static files — does it ever need to write?
+              # Think carefully before setting readOnly: true.
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+
+          resources:
+            requests:
+              cpu:    # TODO
+              memory: # TODO
+            limits:
+              cpu:    # TODO
+              memory: # TODO
+
+          readinessProbe:
+            # TODO: nginx CAN answer HTTP — this is the right container for an httpGet probe.
+            # Which path indicates Nextcloud is ready to serve requests?
+            # Consider: /status.php, /, /login — which one is reliable and fast?
+            httpGet:
+              path: # TODO
+              port: # TODO: fix the port to match the containerPort you corrected above
+            initialDelaySeconds: # TODO: generous — Nextcloud is slow on first boot
+            periodSeconds: 15
+            failureThreshold: # TODO: how many consecutive failures before giving up?
+
+          livenessProbe:
+            httpGet:
+              path: # TODO
+              port: # TODO
+            initialDelaySeconds: # TODO
+            periodSeconds: 30
+            failureThreshold: # TODO
+
+      volumes:
+        - name: nextcloud-data
+          persistentVolumeClaim:
+            claimName: # TODO: name of your PVC (from pvc.yaml)
+
+        - name: nginx-config
+          configMap:
+            name: # TODO: name of your nginx-config ConfigMap
+
+        # TODO: do you need any additional volumes?
+        # Think about what each container needs access to.

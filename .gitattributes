@@ -1,0 +1,33 @@
+# Enforce LF line endings for all text files.
+# Critical for WSL2 users cloning from Windows Git (which defaults to CRLF).
+# Shell scripts with CRLF will silently fail with "bad interpreter" errors.
+
+* text=auto eol=lf
+
+# Explicitly mark shell scripts as text with LF
+*.sh text eol=lf
+
+# YAML files
+*.yaml text eol=lf
+*.yml  text eol=lf
+
+# Markdown and docs
+*.md   text eol=lf
+
+# Config files
+*.json    text eol=lf
+*.toml    text eol=lf
+*.conf    text eol=lf
+*.cfg     text eol=lf
+Makefile  text eol=lf
+
+# Binary files — no line ending conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.tar  binary
+*.gz   binary

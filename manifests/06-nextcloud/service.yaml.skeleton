@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud
+  namespace: # TODO: which namespace?
+  labels:
+    app: nextcloud
+spec:
+  # TODO: which Service type is appropriate here?
+  # This Service is internal — it does not need a LoadBalancer IP.
+  # Traefik reaches it via the Ingress → Service → Pod chain.
+  type: # TODO
+
+  selector:
+    # TODO: these labels must match the pod template labels in the Deployment.
+    # If they don't match, the Service has no Endpoints and all traffic returns 503.
+    # Verify with: kubectl get endpoints nextcloud -n <namespace>
+    app: nextcloud
+
+  ports:
+    - name: http
+      port: 80
+      # TODO: which container in the Nextcloud pod actually listens for HTTP?
+      # PHP-FPM (port 9000) speaks FastCGI — NOT HTTP.
+      # nginx speaks HTTP — but on which port? (Check your Deployment — and fix the error there first.)
+      targetPort: # TODO: which container port should traffic be forwarded to?
+      protocol: TCP

@@ -1,0 +1,61 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nextcloud
+  namespace: # TODO: which namespace?
+  labels:
+    app: nextcloud
+  annotations:
+    # ── Ingress class ──────────────────────────────────────────────────────────
+    # Modern Kubernetes uses spec.ingressClassName (see below).
+    # Some Traefik versions also support an annotation — check what your version needs.
+
+    # ── Body size ──────────────────────────────────────────────────────────────
+    # Nextcloud allows large file uploads. Body size is controlled by nginx's
+    # client_max_body_size directive in your nginx ConfigMap.
+    # Make sure it is set generously (e.g., 512M) in the nginx ConfigMap.
+
+    # ── Proxy headers (Traefik Middleware) ────────────────────────────────────
+    # TODO: Nextcloud uses X-Forwarded-Proto and X-Forwarded-Host to build redirect
+    # URLs. Without them, logging in redirects you to the wrong protocol or host.
+    # Traefik handles this via its Middleware CRD (traefik.io/v1alpha1 kind: Middleware).
+    # Once created, reference it here with:
+    #   traefik.ingress.kubernetes.io/router.middlewares: "<namespace>-<middleware-name>@kubernetescrd"
+    # Research: Traefik Middleware CRD spec.headers.hostsProxyHeaders and customRequestHeaders.
+    traefik.ingress.kubernetes.io/router.middlewares: # TODO: "<namespace>-<name>@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+
+    # ── TLS / cert-manager ────────────────────────────────────────────────────
+    # Leave this commented on Day 2. Uncomment and set on Day 3.
+    # cert-manager.io/cluster-issuer: # TODO (Day 3): name of your ClusterIssuer
+
+spec:
+  # TODO: check which IngressClass name Traefik registered in your cluster.
+  # Run: kubectl get ingressclass
+  # The name here must match exactly.
+  ingressClassName: # TODO
+
+  rules:
+    - host: # TODO: what hostname will users access Nextcloud at?
+             # This must match NEXTCLOUD_TRUSTED_DOMAINS in your ConfigMap.
+             # It must also be in your /etc/hosts (or Windows hosts file).
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: # TODO: name of your Nextcloud Service
+                port:
+                  # TODO: which port does the Nextcloud Service expose?
+                  # Hint: check service.yaml — it is NOT port 9000.
+                  number: # TODO
+
+  # ── TLS — uncomment and complete on Day 3 ────────────────────────────────────
+  # After installing cert-manager and creating a ClusterIssuer, add TLS here.
+  # cert-manager will create the Secret automatically when it sees the annotation above.
+  # tls:
+  #   - hosts:
+  #       - # TODO: same hostname as the rule above
+  #     secretName: # TODO: name for the TLS Secret cert-manager will create
+                    #       (e.g., nextcloud-tls) — does not need to exist yet

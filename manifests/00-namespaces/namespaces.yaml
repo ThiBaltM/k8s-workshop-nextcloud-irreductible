@@ -1,0 +1,30 @@
+# Create the four namespaces required for this workshop.
+# Apply this file FIRST — every other resource depends on these namespaces existing.
+#
+# Required namespaces (names are not arbitrary — Helm charts reference them exactly):
+#   - nextcloud       : application stack (Nextcloud, PostgreSQL, Redis)
+#   - monitoring      : observability stack (Prometheus, Grafana)
+#   - traefik         : ingress controller
+#   - metallb-system  : load balancer controller
+#
+# TODO: fill in the four Namespace resources below.
+# Each namespace should have at least one label (e.g., name: <namespace-name>).
+# Labels are used by NetworkPolicy selectors and make kubectl filtering easier.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: # TODO: first namespace name
+  labels:
+    name: # TODO: same as the namespace name
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: # TODO: second namespace name
+  labels:
+    name: # TODO
+
+---
+# TODO: add the remaining two Namespace resources in the same format, separated by ---

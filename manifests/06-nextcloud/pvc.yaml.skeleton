@@ -1,0 +1,40 @@
+# PersistentVolumeClaim for Nextcloud application data.
+#
+# Nextcloud stores all user files and PHP application code under /var/www/html.
+# This PVC is shared between the PHP-FPM container and the nginx sidecar.
+#
+# Note: CloudNativePG manages its own PVC automatically — you do NOT create one for PostgreSQL.
+#
+# Rename to pvc.yaml when complete.
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # TODO: choose a name. You will reference this name in the Deployment's volumes section.
+  name: # TODO (e.g., nextcloud-data)
+  namespace: # TODO: which namespace?
+  labels:
+    app: nextcloud
+spec:
+  # TODO: which access mode is appropriate here?
+  # Consider: how many replicas will the Deployment have?
+  # Can local-path storage be mounted by multiple nodes simultaneously?
+  # Options: ReadWriteOnce, ReadWriteMany, ReadOnlyMany
+  accessModes:
+    - # TODO
+
+  # TODO: how much storage does Nextcloud need for the workshop?
+  # The application code alone is ~300 MB.
+  # Add space for user file uploads during the demo.
+  resources:
+    requests:
+      storage: # TODO (e.g., 5Gi)
+
+  # TODO: should you specify a storageClassName?
+  # Leaving it empty uses the cluster default (local-path in kind).
+  # Being explicit is better practice — it avoids surprises when the default changes.
+  # storageClass: # TODO: uncomment and set, or leave commented for default
+
+# IMPORTANT: local-path-provisioner only binds this PVC when a pod first mounts it.
+# Running `kubectl get pvc` right after apply will show status Pending — that is normal.
+# It will transition to Bound once the Nextcloud pod is created and scheduled.

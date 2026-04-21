@@ -1,0 +1,101 @@
+# Redis — session locking and caching for Nextcloud
+#
+# Without Redis, concurrent Nextcloud requests can corrupt the database.
+# Redis is also required for file locking in a multi-user setup.
+#
+# This file defines a Deployment and a ClusterIP Service.
+# Rename to redis.yaml when complete.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: # TODO: same namespace as Nextcloud
+  labels:
+    app: redis
+spec:
+  replicas: 1   # Redis is stateful — a single replica is correct here
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          # TODO: choose an appropriate image and tag.
+          # Consider: official image, a specific major version, a minimal variant.
+          # Avoid :latest in any environment you care about.
+          image: # TODO (e.g., redis:7-alpine)
+
+          # TODO: Redis should be started with memory limits configured.
+          # Without maxmemory, Redis will consume all available memory and get OOM-killed.
+          # You can set it via command args or a config file mounted from a ConfigMap.
+          # Research: what does maxmemory-policy allkeys-lru do?
+          command: # TODO: pass redis-server with --maxmemory and --maxmemory-policy args
+
+          ports:
+            - containerPort: # TODO: what port does Redis listen on?
+              name: redis
+
+          resources:
+            requests:
+              cpu:    # TODO
+              memory: # TODO
+            limits:
+              cpu:    # TODO
+              # TODO: the memory limit must be >= the maxmemory you set above.
+              # If the limit is lower than maxmemory, Redis will be killed by the kernel
+              # before it can enforce its own eviction policy.
+              memory: # TODO
+
+          readinessProbe:
+            # TODO: Redis supports a built-in command for health checks.
+            # Research: what does `redis-cli ping` return when Redis is healthy?
+            # Use an exec probe.
+            exec:
+              command:
+                # TODO: write the probe command
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            exec:
+              command:
+                # TODO: same command as readiness
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+          # TODO: does Redis need persistent storage for the workshop?
+          # Think about what Redis stores here (session data, cache) and what
+          # happens if the pod restarts. Make a decision and justify it.
+          # volumeMounts:
+          #   - name: redis-data
+          #     mountPath: /data
+
+      # TODO: uncomment volumes section if you decided Redis needs persistence
+      # volumes:
+      #   - name: redis-data
+      #     persistentVolumeClaim:
+      #       claimName: # TODO
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: # TODO: same namespace as the Deployment above
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: redis   # must match the Deployment's pod template labels
+  ports:
+    - name: redis
+      port: # TODO: what port does this Service expose?
+      targetPort: # TODO: what port on the container?
+      # Note: both should be the same Redis port — but you must fill them in explicitly.
+      # A Service with wrong targetPort silently drops all traffic.

@@ -1,0 +1,46 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  # TODO: choose a name for your PostgreSQL cluster (e.g., postgres).
+  # This name becomes the prefix for pod names AND the auto-created Secrets.
+  # You will reference it later in your Deployment spec. Choose it carefully.
+  name: # TODO
+  namespace: # TODO: which namespace does the database live in?
+spec:
+  # TODO: how many instances?
+  # You need a primary that handles writes AND a replica for read distribution
+  # and failover. What is the minimum number of instances to achieve that?
+  instances: # TODO
+
+  postgresql:
+    parameters:
+      # TODO (optional): tune PostgreSQL parameters if needed.
+      # For the workshop, defaults are acceptable.
+      # In production you would set: max_connections, shared_buffers, work_mem, etc.
+
+  bootstrap:
+    initdb:
+      # TODO: define the database and its owner (application user).
+      # These values are what your Nextcloud pod will connect to.
+      # After applying, CNPG auto-creates a Secret named <cluster-name>-app
+      # containing the generated password and connection details.
+      #
+      # You will reference 'database' as POSTGRES_DB and 'owner' as POSTGRES_USER
+      # in your Nextcloud Deployment. Choose names you will remember.
+      database: # TODO: database name (e.g., nextcloud)
+      owner:    # TODO: application username (e.g., nextcloud)
+      # Note: do NOT set a password here — CNPG generates and manages it automatically.
+
+  storage:
+    # TODO: how much persistent storage does PostgreSQL need for the workshop?
+    # Consider: user data, indices, WAL (Write-Ahead Log) files.
+    # This creates a PVC automatically — you do NOT create a separate PVC for it.
+    size: # TODO (e.g., 2Gi)
+    # storageClass: # Leave commented to use the cluster default (local-path).
+    #               # Uncomment and set if you want to be explicit.
+
+  # TODO (bonus): should WAL storage be separated from data storage?
+  # WAL files grow under write load and can fill the data volume unexpectedly.
+  # For the workshop this is not critical, but worth understanding.
+  # walStorage:
+  #   size: # TODO
