@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nextcloud-config
+  namespace: nextcloud
+data:
+  NEXTCLOUD_TRUSTED_DOMAINS: nextcloud.local
+  NEXTCLOUD_UPDATE: "1"
+  OVERWRITEPROTOCOL: http
+  OVERWRITECLIURL: http://nextcloud.local
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  PHP_MEMORY_LIMIT: 512M
+  PHP_UPLOAD_LIMIT: 512M

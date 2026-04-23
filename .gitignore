@@ -42,3 +42,4 @@ rendered/
 local/
 tls.key
 tls.crt
+manifests/06-nextcloud/secrets.yaml
