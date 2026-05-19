@@ -1,14 +1,70 @@
+# ── ConfigMap 1: Nextcloud environment variables ──────────────────────────────
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nextcloud-config
   namespace: nextcloud
 data:
-  NEXTCLOUD_TRUSTED_DOMAINS: nextcloud.local
+  NEXTCLOUD_TRUSTED_DOMAINS: "nextcloud.local"
+  NEXTCLOUD_ADMIN_USER: "admin"
+  OVERWRITEPROTOCOL: "http"
+  OVERWRITECLIURL: "http://nextcloud.local"
+  POSTGRES_HOST: "postgres-rw.nextcloud.svc.cluster.local"
+  POSTGRES_DB: "nextcloud"
+  REDIS_HOST: "redis"
+  REDIS_HOST_PORT: "6379"
+  PHP_MEMORY_LIMIT: "512M"
+  PHP_UPLOAD_LIMIT: "512M"
   NEXTCLOUD_UPDATE: "1"
-  OVERWRITEPROTOCOL: http
-  OVERWRITECLIURL: http://nextcloud.local
-  REDIS_HOST: redis
-  REDIS_PORT: "6379"
-  PHP_MEMORY_LIMIT: 512M
-  PHP_UPLOAD_LIMIT: 512M
+
+---
+# ── ConfigMap 2: nginx configuration ──────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: nextcloud
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name _;
+
+      root /var/www/html;
+      index index.php index.html;
+
+      client_max_body_size 512M;
+
+      location / {
+        try_files $uri $uri/ /index.php$request_uri;
+      }
+
+      location ^~ /.well-known {
+        return 301 /index.php$request_uri;
+      }
+
+      # PHP request handling (WebDAV OK)
+      location ~ \.php(?:$|/) {
+        fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+        if (!-f $document_root$fastcgi_script_name) { return 404; }
+
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+        fastcgi_param PATH_INFO       $fastcgi_path_info;
+        fastcgi_param HTTPS           $https if_not_empty;
+        fastcgi_read_timeout          300;
+        fastcgi_send_timeout          300;
+      }
+
+      location ~ /\. {
+        deny all;
+      }
+
+      location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/) {
+        return 404;
+      }
+    }
