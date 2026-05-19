@@ -7,8 +7,8 @@ metadata:
 data:
   NEXTCLOUD_TRUSTED_DOMAINS: "nextcloud.local"
   NEXTCLOUD_ADMIN_USER: "admin"
-  OVERWRITEPROTOCOL: "http"
-  OVERWRITECLIURL: "http://nextcloud.local"
+  OVERWRITEPROTOCOL: "https"
+  OVERWRITECLIURL: "https://nextcloud.local"
   POSTGRES_HOST: "postgres-rw.nextcloud.svc.cluster.local"
   POSTGRES_DB: "nextcloud"
   REDIS_HOST: "redis"

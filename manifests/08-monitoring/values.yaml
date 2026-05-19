@@ -1,0 +1,62 @@
+# Configuration globale pour le kube-prometheus-stack
+
+# ── Grafana Configuration ─────────────────────────────────────────────────────
+grafana:
+  enabled: true
+
+  # Mot de passe admin personnalisé (Exigence du TP)
+  adminPassword: "admin"  # Tu pourras le changer si tu veux, mais mets un truc connu !
+
+  # Sauvegarde des dashboards après redémarrage du pod
+  persistence:
+    enabled: true
+    storageClassName: "standard" # Utilise le même StorageClass que Nextcloud
+    size: 2Gi
+
+  # Exposition de Grafana via Traefik (Exigence du TP)
+  ingress:
+    enabled: true
+    ingressClassName: "traefik"
+    hosts:
+      - grafana.local
+    path: /
+    # On ajoute directement le TLS auto-signé pour valider le Step 6 en même temps !
+    annotations:
+      cert-manager.io/cluster-issuer: "selfsigned-issuer"
+    tls:
+      - hosts:
+          - grafana.local
+        secretName: grafana-tls
+
+# ── Prometheus Configuration ──────────────────────────────────────────────────
+prometheus:
+  enabled: true
+
+  prometheusSpec:
+    # IMPORTANT : Permet à Prometheus de chercher des PodMonitors/ServiceMonitors dans TOUS les namespaces
+    # (Indispensable pour détecter les métriques PostgreSQL/CNPG au Step 7 !)
+    podMonitorNamespaceSelector: {}
+    serviceMonitorNamespaceSelector: {}
+
+    # Sauvegarde des métriques historiques après redémarrage du pod
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: "standard"
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+# ── Alertmanager Configuration ────────────────────────────────────────────────
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: "standard"
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi

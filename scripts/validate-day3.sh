@@ -149,20 +149,27 @@ check_nextcloud_https() {
   command -v curl &>/dev/null || return 1
 
   local ip host status
-  ip=$(kubectl get svc -n traefik \
-       -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   host=$(kubectl get ingress -n nextcloud \
          -o jsonpath='{.items[0].spec.rules[0].host}' 2>/dev/null || true)
   host="${host:-nextcloud.local}"
 
+  # 1) Resolve $host to 127.0.0.1 (macOS/WSL2/Linux via kind extraPortMappings).
+  status=$(curl -sk -o /dev/null -w "%{http_code}" \
+           --max-time 10 --connect-timeout 5 \
+           --resolve "$host:443:127.0.0.1" "https://$host" 2>/dev/null || echo "000")
+  { [ "$status" = "200" ] || [ "$status" = "302" ] || [ "$status" = "301" ]; } && return 0
+
+  # 2) Resolve $host to the Traefik EXTERNAL-IP (Linux native only).
+  ip=$(kubectl get svc -n traefik \
+       -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   if [ -n "${ip:-}" ]; then
     status=$(curl -sk -o /dev/null -w "%{http_code}" \
              --max-time 10 --connect-timeout 5 \
-             -H "Host: $host" "https://$ip" 2>/dev/null || echo "000")
+             --resolve "$host:443:$ip" "https://$host" 2>/dev/null || echo "000")
     { [ "$status" = "200" ] || [ "$status" = "302" ] || [ "$status" = "301" ]; } && return 0
   fi
 
-  # Fallback: direct URL (requires hosts file)
+  # 3) Plain URL — relies on /etc/hosts.
   status=$(curl -sk -o /dev/null -w "%{http_code}" \
            --max-time 10 --connect-timeout 5 \
            "https://$host" 2>/dev/null || echo "000")
@@ -193,9 +200,11 @@ check_alertmanager_running() {
 
 check_grafana_running() {
   local ready
+  # kubectl get -l returns a List, so use items[0] in jsonpath — bare .status.readyReplicas
+  # against a List always yields empty and reports the check as failed.
   ready=$(kubectl get deployment -n monitoring \
           -l app.kubernetes.io/name=grafana \
-          -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+          -o jsonpath='{.items[0].status.readyReplicas}' 2>/dev/null || echo "0")
   [ "${ready:-0}" -ge 1 ]
 }
 
@@ -240,20 +249,27 @@ check_grafana_https() {
   command -v curl &>/dev/null || return 1
 
   local ip host status
-  ip=$(kubectl get svc -n traefik \
-       -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   host=$(kubectl get ingress -n monitoring \
          -o jsonpath='{.items[0].spec.rules[0].host}' 2>/dev/null || true)
   host="${host:-grafana.local}"
 
+  # 1) Resolve $host to 127.0.0.1 (macOS/WSL2/Linux via kind extraPortMappings).
+  status=$(curl -sk -o /dev/null -w "%{http_code}" \
+           --max-time 10 --connect-timeout 5 \
+           --resolve "$host:443:127.0.0.1" "https://$host" 2>/dev/null || echo "000")
+  { [ "$status" = "200" ] || [ "$status" = "302" ]; } && return 0
+
+  # 2) Resolve $host to the Traefik EXTERNAL-IP (Linux native only).
+  ip=$(kubectl get svc -n traefik \
+       -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   if [ -n "${ip:-}" ]; then
     status=$(curl -sk -o /dev/null -w "%{http_code}" \
              --max-time 10 --connect-timeout 5 \
-             -H "Host: $host" "https://$ip" 2>/dev/null || echo "000")
+             --resolve "$host:443:$ip" "https://$host" 2>/dev/null || echo "000")
     { [ "$status" = "200" ] || [ "$status" = "302" ]; } && return 0
   fi
 
-  # Fallback: direct URL (requires hosts file)
+  # 3) Plain URL — relies on /etc/hosts.
   status=$(curl -sk -o /dev/null -w "%{http_code}" \
            --max-time 10 --connect-timeout 5 \
            "https://$host" 2>/dev/null || echo "000")
